@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -77,9 +78,21 @@ func (r *openAIAccountTestRepo) SetRateLimited(_ context.Context, id int64, rese
 	return nil
 }
 
+func readRequestBodyJSON(t *testing.T, req *http.Request) map[string]any {
+	t.Helper()
+
+	body, err := io.ReadAll(req.Body)
+	require.NoError(t, err)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(body, &payload))
+	return payload
+}
+
 func TestAccountTestService_OpenAISuccessPersistsSnapshotFromHeaders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx, recorder := newTestContext()
+	prompt := "forward this prompt from unit test"
 
 	resp := newJSONResponse(http.StatusOK, "")
 	resp.Body = io.NopCloser(strings.NewReader(`data: {"type":"response.completed"}
@@ -103,12 +116,20 @@ func TestAccountTestService_OpenAISuccessPersistsSnapshotFromHeaders(t *testing.
 		Credentials: map[string]any{"access_token": "test-token"},
 	}
 
-	err := svc.testOpenAIAccountConnection(ctx, account, "gpt-5.4")
+	err := svc.testOpenAIAccountConnection(ctx, account, "gpt-5.4", prompt)
 	require.NoError(t, err)
 	require.NotEmpty(t, repo.updatedExtra)
 	require.Equal(t, 42.0, repo.updatedExtra["codex_5h_used_percent"])
 	require.Equal(t, 88.0, repo.updatedExtra["codex_7d_used_percent"])
 	require.Contains(t, recorder.Body.String(), "test_complete")
+	require.Len(t, upstream.requests, 1)
+
+	payload := readRequestBodyJSON(t, upstream.requests[0])
+	input := payload["input"].([]any)
+	message := input[0].(map[string]any)
+	content := message["content"].([]any)
+	part := content[0].(map[string]any)
+	require.Equal(t, prompt, part["text"])
 }
 
 func TestAccountTestService_OpenAI429PersistsSnapshotAndRateLimit(t *testing.T) {
@@ -134,7 +155,7 @@ func TestAccountTestService_OpenAI429PersistsSnapshotAndRateLimit(t *testing.T) 
 		Credentials: map[string]any{"access_token": "test-token"},
 	}
 
-	err := svc.testOpenAIAccountConnection(ctx, account, "gpt-5.4")
+	err := svc.testOpenAIAccountConnection(ctx, account, "gpt-5.4", "")
 	require.Error(t, err)
 	require.NotEmpty(t, repo.updatedExtra)
 	require.Equal(t, 100.0, repo.updatedExtra["codex_5h_used_percent"])
