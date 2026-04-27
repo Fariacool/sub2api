@@ -257,7 +257,8 @@ jobs:
             MESSAGE+="• [Docker Hub](https://hub.docker.com/r/${DOCKER_IMAGE})"$'\n'
           fi
           MESSAGE+="• [GitHub Packages](https://github.com/${REPO}/pkgs/container/sub2api)"$'\n'$'\n'
-          MESSAGE+="#Sub2API #Release #${TAG_NAME//./_}"
+          TAG_HASH=$(echo "$TAG_NAME" | tr -cd '[:alnum:]')
+          MESSAGE+="#Sub2API #Release #${TAG_HASH}"
 
           # 发送消息
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
