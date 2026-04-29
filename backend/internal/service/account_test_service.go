@@ -218,7 +218,7 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		return s.testBedrockAccountConnection(c, ctx, account, testModelID, prompt)
 	}
 	if account.Type == AccountTypeServiceAccount {
-		return s.testClaudeVertexServiceAccountConnection(c, ctx, account, testModelID)
+		return s.testClaudeVertexServiceAccountConnection(c, ctx, account, testModelID, prompt)
 	}
 
 	// Determine authentication method and API URL
@@ -323,7 +323,7 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 	return s.processClaudeStream(c, resp.Body)
 }
 
-func (s *AccountTestService) testClaudeVertexServiceAccountConnection(c *gin.Context, ctx context.Context, account *Account, testModelID string) error {
+func (s *AccountTestService) testClaudeVertexServiceAccountConnection(c *gin.Context, ctx context.Context, account *Account, testModelID string, prompt string) error {
 	if mappedModel, matched := account.ResolveMappedModel(testModelID); matched {
 		testModelID = mappedModel
 	} else {
@@ -336,7 +336,7 @@ func (s *AccountTestService) testClaudeVertexServiceAccountConnection(c *gin.Con
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
 	c.Writer.Flush()
 
-	payload, err := createTestPayload(testModelID)
+	payload, err := createTestPayload(testModelID, prompt)
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to create test payload")
 	}
